@@ -9,5 +9,15 @@
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
+    <script>
+      $.getJSON('http://www.geoplugin.net/json.gp', function(data) {
+        console.log(JSON.stringify(data, null, 2));
+        let msg = document.createElement('p')
+        msg.textContent = JSON.stringify(data, null, 2)
+        console.log('msg', msg)
+        document.body.appendChild(msg)
+      });
+    </script>
   </body>
 </html>

@@ -10,11 +10,18 @@ const count = ref(0)
 const canvasRef = ref(null)
 let pngData = ref('')
 let webglString = reactive({})
+const nagivatorObj = reactive(navigator)
+console.log('nagivatorObj', nagivatorObj)
+const screenObj = reactive(screen)
+const timeObj = ref(new Date().getTimezoneOffset())
 onMounted(() => {
   // DOM 元素将在初始渲染后分配给 ref
   console.log('canvaselement', canvasRef) // <div>This is a root element</div>
-  const canvas = canvasRef.value
-  const ctx = canvas.getContext("2d");;
+  const outScreenCanvas = document.createElement('canvas')
+  const showCanvas = canvasRef.value
+  const showCanvasCtx = showCanvas.getContext("2d")
+  const canvas = outScreenCanvas
+  const ctx = canvas.getContext("2d");
 
   // // ctx.fillStyle = 'green';
   // // ctx.fillRect(10, 10, 150, 100);
@@ -33,6 +40,8 @@ onMounted(() => {
   ctx.fillText(txt, 4, 17);
   // console.log('canvas data', canvas.toDataURL())
   pngData.value = sha256(canvas.toDataURL())
+  // const outScreenCanvasImgData = ctx.getImageData(0, 0, outScreenCanvas.width, outScreenCanvas.height)
+  showCanvasCtx.drawImage(outScreenCanvas, 0, 0)
   // pngData.value = hmacSHA512(canvas.toDataURL(), 'canvas finger')
   const glCanvas = document.createElement('canvas')
   const gl = glCanvas.getContext("webgl2");
@@ -76,6 +85,42 @@ onMounted(() => {
       <tr>
         <td>webgl renderer</td>
         <td>{{ webglString.renderer }}</td>
+      </tr>
+      <tr>
+        <td>浏览器http请求中的用户代理</td>
+        <td>{{ nagivatorObj.userAgent }}</td>
+      </tr>
+      <tr>
+        <td>浏览器的语言</td>
+        <td>{{ nagivatorObj.language }}</td>
+      </tr>
+      <tr>
+        <td>操作系统</td>
+        <td>{{ nagivatorObj.platform }}</td>
+      </tr>
+      <tr>
+        <td>设备能够支持的最大同时触摸的点数</td>
+        <td>{{ nagivatorObj.maxTouchPoints }}</td>
+      </tr>
+      <tr>
+        <td>可用的逻辑处理器核心数</td>
+        <td>{{ nagivatorObj.hardwareConcurrency }}</td>
+      </tr>
+      <!-- <tr>
+        <td>地理位位置信息</td>
+        <td>{{ position }}</td>
+      </tr> -->
+      <tr>
+        <td>浏览器插件</td>
+        <td>{{ Array.from(nagivatorObj.plugins).map(item => item.name).join(',') }}</td>
+      </tr>
+      <tr>
+        <td>设备屏幕的宽高与色彩信息</td>
+        <td>{{ screenObj.width }} * {{ screenObj.height }} * {{ screenObj.colorDepth }}</td>
+      </tr>
+      <tr>
+        <td>格林威治时间和本地时间之间的时差</td>
+        <td>{{ timeObj }}</td>
       </tr>
     </tbody>
   </table>
