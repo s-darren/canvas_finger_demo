@@ -2,6 +2,7 @@
 import { ref, onMounted, reactive } from 'vue'
 import sha256 from 'crypto-js/sha256';
 // import hmacSHA512 from 'crypto-js/hmac-sha512';
+import * as echarts from 'echarts';
 defineProps({
   msg: String
 })
@@ -14,6 +15,7 @@ const nagivatorObj = reactive(navigator)
 console.log('nagivatorObj', nagivatorObj)
 const screenObj = reactive(screen)
 const timeObj = ref(new Date().getTimezoneOffset())
+let audioFingerprint = ref('123445')
 onMounted(() => {
   // DOM 元素将在初始渲染后分配给 ref
   console.log('canvaselement', canvasRef) // <div>This is a root element</div>
@@ -62,11 +64,133 @@ onMounted(() => {
     };
   }
 })
+function test() {
+  // const audioCtx = new AudioContext()
+  // let oscillator= audioCtx.createOscillator()
+  // let gainNode = audioCtx.createGain()
+  // oscillator.connect(gainNode)
+  // oscillator.connect(audioCtx.destination)
+  // oscillator.type = 'sine'
+  // oscillator.frequency.value = 196.00
+  // gainNode.gain.setValueAtTime(0, audioCtx.currentTime)
+  // gainNode.gain.linearRampToValueAtTime(1, audioCtx.currentTime + 0.01)
+  // oscillator.start(audioCtx.currentTime)
+  // gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1)
+  // oscillator.stop(audioCtx.currentTime + 1)
+  // console.log('oscillator', audioCtx.currentTime)
+  var each = function(obj, iterator) {
+    if (Array.prototype.forEach && obj.forEach === Array.prototype.forEach) {
+        obj.forEach(iterator)
+    } else if (obj.length === +obj.length) {
+        for (var i = 0, l = obj.length; i < l; i++) {
+            iterator(obj[i], i, obj)
+        }
+    } else {
+        for (var key in obj) {
+            if (obj.hasOwnProperty(key)) {
+                iterator(obj[key], key, obj)
+            }
+        }
+    }
+  }
+
+  var AudioContext = window.OfflineAudioContext || window.webkitOfflineAudioContext
+
+  var context = new AudioContext(1, 44100, 44100)
+
+  var oscillator = context.createOscillator()
+  oscillator.type = 'triangle'
+  oscillator.frequency.setValueAtTime(10000, context.currentTime)
+
+  var compressor = context.createDynamicsCompressor()
+  each([
+    ['threshold', -50],
+    ['knee', 40],
+    ['ratio', 12],
+    ['reduction', -20],
+    ['attack', 0],
+    ['release', 0.25]
+  ], function (item) {
+    if (compressor[item[0]] !== undefined && typeof compressor[item[0]].setValueAtTime === 'function') {
+      compressor[item[0]].setValueAtTime(item[1], context.currentTime)
+    }
+  })
+
+  oscillator.connect(compressor)
+  compressor.connect(context.destination)
+  oscillator.start(0)
+  context.startRendering()
+
+  var audioTimeoutId = setTimeout(function () {
+    console.warn('Audio fingerprint timed out. Please report bug at https://github.com/Valve/fingerprintjs2 with your user agent: "' + navigator.userAgent + '".')
+    context.oncomplete = function () { }
+    context = null
+    return done('audioTimeout')
+  }, 100)
+
+  context.oncomplete = (event) => {
+    // var fingerprint
+    console.log('fingerprintfingerprint', audioFingerprint)
+    try {
+      clearTimeout(audioTimeoutId)
+      audioFingerprint.value = event.renderedBuffer.getChannelData(0)
+        .slice(4500, 5000)
+        .reduce(function (acc, val) { return acc + Math.abs(val) }, 0)
+        .toString()
+      oscillator.disconnect()
+      compressor.disconnect()
+      showChart(event.renderedBuffer.getChannelData(0)
+        .slice(4500, 5000))
+    } catch (error) {
+      console.log(error)
+      return
+    }
+    console.log(audioFingerprint.value)
+  }
+}
+
+function showChart(source) {
+  const temparray = Array.from(source)
+  const key = new Array(temparray.length).fill('')
+  console.log('showChart', source, temparray, temparray.length)
+  var myChart = echarts.init(document.getElementById('main'));
+  // 绘制图表
+  myChart.setOption({
+    title: {
+      text: 'ECharts 入门示例'
+    },
+    tooltip: {},
+    dataZoom: [
+      {
+        type: 'inside',
+        start: 0,
+        end: 10
+      },
+      {
+        start: 0,
+        end: 10
+      }
+    ],
+    xAxis: {
+      data: key,
+      type: 'category'
+    },
+    yAxis: {},
+    series: [
+      {
+        data: temparray,
+        type: 'line',
+        smooth: true
+      }
+    ]
+  });
+}
 
 </script>
 
 <template>
   <h1>{{ msg }}</h1>
+  <button @click="test">aaaaaa</button>
   <canvas id="canvas" ref="canvasRef"></canvas>
   <table border class="finger_table">
     <thead>
@@ -85,6 +209,10 @@ onMounted(() => {
       <tr>
         <td>webgl renderer</td>
         <td>{{ webglString.renderer }}</td>
+      </tr>
+      <tr>
+        <td>audio finger</td>
+        <td>{{ audioFingerprint }}</td>
       </tr>
       <tr>
         <td>浏览器http请求中的用户代理</td>
@@ -127,26 +255,7 @@ onMounted(() => {
   <!-- <p class="png_data">HASH OF CANVAS FINGERPRINT: {{ pngData }}</p>
   <p class="png_data">vendor: {{ webglString.vendor }}</p>
   <p class="png_data">renderer: {{ webglString.renderer }}</p> -->
-  <p>
-    Recommended IDE setup:
-    <a href="https://code.visualstudio.com/" target="_blank">VSCode</a>
-    +
-    <a href="https://github.com/johnsoncodehk/volar" target="_blank">Volar</a>
-  </p>
-
-  <p>
-    <a href="https://vitejs.dev/guide/features.html" target="_blank">
-      Vite Documentation
-    </a>
-    |
-    <a href="https://v3.vuejs.org/" target="_blank">Vue 3 Documentation</a>
-  </p>
-
-  <button type="button" @click="count++">count is: {{ count }}</button>
-  <p>
-    Edit
-    <code>components/HelloWorld.vue</code> to test hot module replacement.
-  </p>
+  <div id="main" class="audio_chart"></div>
 </template>
 
 <style scoped>
@@ -159,5 +268,9 @@ a {
 .finger_table {
   border: 2px solid #333333;
   border-collapse: collapse;
+}
+.audio_chart {
+  width: 80%;
+  height: 500px;
 }
 </style>
