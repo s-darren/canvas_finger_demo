@@ -1,21 +1,37 @@
 <script setup>
 import { ref, onMounted, reactive } from 'vue'
 import sha256 from 'crypto-js/sha256';
+import md5 from 'crypto-js/md5';
 // import hmacSHA512 from 'crypto-js/hmac-sha512';
 import * as echarts from 'echarts';
 defineProps({
   msg: String
 })
 
-const count = ref(0)
 const canvasRef = ref(null)
-let pngData = ref('')
+let canvasFinger = ref('')
 let webglString = reactive({})
-const nagivatorObj = reactive(navigator)
-console.log('nagivatorObj', nagivatorObj)
+const navigatorObj = reactive(navigator)
+// console.log('navigatorObj', navigatorObj)
 const screenObj = reactive(screen)
+// 获取时区信息
 const timeObj = ref(new Date().getTimezoneOffset())
-let audioFingerprint = ref('123445')
+let audioFingerprint = ref('')
+let audioFingerprintHash = ref('')
+
+// 服务器协助返回信息
+let extraJsonData = reactive({})
+// 
+let compositeString = ref('')
+let compositeHash = ref('')
+
+
+let showCanvasSample = ref(false)
+function toggleCanvasSample() {
+  showCanvasSample.value = !showCanvasSample.value
+}
+
+
 onMounted(() => {
   // DOM 元素将在初始渲染后分配给 ref
   console.log('canvaselement', canvasRef) // <div>This is a root element</div>
@@ -25,9 +41,6 @@ onMounted(() => {
   const canvas = outScreenCanvas
   const ctx = canvas.getContext("2d");
 
-  // // ctx.fillStyle = 'green';
-  // // ctx.fillRect(10, 10, 150, 100);
-  // // Text with lowercase/uppercase/punctuation symbols
   var txt = "BrowserLeaks,com <canvas> 1.0";
   ctx.textBaseline = "top";
   // The most common type
@@ -40,17 +53,19 @@ onMounted(() => {
   ctx.fillText(txt, 2, 15);
   ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
   ctx.fillText(txt, 4, 17);
+
   // console.log('canvas data', canvas.toDataURL())
-  pngData.value = sha256(canvas.toDataURL())
-  // const outScreenCanvasImgData = ctx.getImageData(0, 0, outScreenCanvas.width, outScreenCanvas.height)
+  canvasFinger.value = sha256(canvas.toDataURL())
+
   showCanvasCtx.drawImage(outScreenCanvas, 0, 0)
-  // pngData.value = hmacSHA512(canvas.toDataURL(), 'canvas finger')
+  // 获取webgl相关硬件信息
   const glCanvas = document.createElement('canvas')
   const gl = glCanvas.getContext("webgl2");
   const webglMsg = getHardwareInfo(gl)
   webglString.vendor = webglMsg.vendor
   webglString.renderer = webglMsg.renderer
-  console.log('webglString.value', webglString);
+  // console.log('webglString.value', webglString);
+  
   function getHardwareInfo(gl) {
     var debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
     if (!debugInfo) {
@@ -63,6 +78,8 @@ onMounted(() => {
       renderer: renderer,
     };
   }
+
+  test()
 })
 function test() {
   // const audioCtx = new AudioContext()
@@ -130,7 +147,7 @@ function test() {
 
   context.oncomplete = (event) => {
     // var fingerprint
-    console.log('fingerprintfingerprint', audioFingerprint)
+    console.log('fingerprintfingerprint', event.renderedBuffer.getChannelData(0))
     try {
       clearTimeout(audioTimeoutId)
       audioFingerprint.value = event.renderedBuffer.getChannelData(0)
@@ -139,13 +156,18 @@ function test() {
         .toString()
       oscillator.disconnect()
       compressor.disconnect()
-      showChart(event.renderedBuffer.getChannelData(0)
-        .slice(4500, 5000))
+      audioFingerprintHash.value = sha256(audioFingerprint.value)
+      showChart(event.renderedBuffer.getChannelData(0).slice(4500, 5000))
     } catch (error) {
       console.log(error)
       return
     }
-    console.log(audioFingerprint.value)
+    console.log(audioFingerprint.value, 
+      sha256(
+        audioFingerprint.value
+      )
+      .toString()
+    )
   }
 }
 
@@ -157,7 +179,7 @@ function showChart(source) {
   // 绘制图表
   myChart.setOption({
     title: {
-      text: 'ECharts 入门示例'
+      text: 'audio 波形'
     },
     tooltip: {},
     dataZoom: [
@@ -180,18 +202,56 @@ function showChart(source) {
       {
         data: temparray,
         type: 'line',
-        smooth: true
+        // smooth: true
       }
     ]
   });
 }
-
+function getExtraJson() {
+  $.getJSON('http://www.geoplugin.net/json.gp', function(data) {
+    // let msgObj = JSON.stringify(data, null, 2)
+    console.log('getJSON', data);
+    // extraJsonData = reactive({
+    //   ...data
+    // })
+    extraJsonData.geoplugin_city = data.geoplugin_city
+    extraJsonData.geoplugin_timezone = data.geoplugin_timezone
+    extraJsonData.geoplugin_request = data.geoplugin_request
+  });
+}
+getExtraJson()
+function getCompositeHash() {
+  // 
+  let tempCompositeObj = [
+    webglString.vendor,
+    webglString.renderer,
+    navigatorObj.platform,
+    navigatorObj.maxTouchPoints,
+    navigatorObj.hardwareConcurrency,
+    `${ screenObj.width }*${ screenObj.height }*${ screenObj.colorDepth }`,
+    timeObj.value,
+    canvasFinger.value,
+    audioFingerprint.value
+  ]
+  let tempcompositeString = ``
+  for(let i=0;i<tempCompositeObj.length;i++) {
+    if(i === 0) {
+      tempcompositeString = `${tempCompositeObj[i]}`
+    } else {
+      tempcompositeString += `_${tempCompositeObj[i]}`
+    }
+  }
+  console.log('compositeString', tempcompositeString)
+  compositeString.value = tempcompositeString
+  compositeHash.value = sha256(compositeString.value)
+}
 </script>
 
 <template>
-  <h1>{{ msg }}</h1>
-  <button @click="test">aaaaaa</button>
+  <!-- <h1>{{ msg }}</h1> -->
   <canvas id="canvas" ref="canvasRef"></canvas>
+  <img v-show="showCanvasSample" alt="canvas sample" src="../assets/canvas-fingerprinting.gif" />
+  <div id="main" class="audio_chart"></div>
   <table border class="finger_table">
     <thead>
       <th>name</th>
@@ -199,8 +259,8 @@ function showChart(source) {
     </thead>
     <tbody>
       <tr>
-        <td>canvas finger</td>
-        <td>{{ pngData }}</td>
+        <td>canvas finger<button @click="toggleCanvasSample">toggle sample</button></td>
+        <td>{{ canvasFinger }}</td>
       </tr>
       <tr>
         <td>webgl vendor</td>
@@ -211,28 +271,31 @@ function showChart(source) {
         <td>{{ webglString.renderer }}</td>
       </tr>
       <tr>
-        <td>audio finger</td>
-        <td>{{ audioFingerprint }}</td>
+        <td>
+          audio finger
+          <!-- <button @click="test">get Audio fingerprint</button> -->
+        </td>
+        <td>{{ audioFingerprint }}({{ audioFingerprintHash }})</td>
       </tr>
       <tr>
         <td>浏览器http请求中的用户代理</td>
-        <td>{{ nagivatorObj.userAgent }}</td>
+        <td>{{ navigatorObj.userAgent }}</td>
       </tr>
       <tr>
         <td>浏览器的语言</td>
-        <td>{{ nagivatorObj.language }}</td>
+        <td>{{ navigatorObj.language }}</td>
       </tr>
       <tr>
         <td>操作系统</td>
-        <td>{{ nagivatorObj.platform }}</td>
+        <td>{{ navigatorObj.platform }}</td>
       </tr>
       <tr>
         <td>设备能够支持的最大同时触摸的点数</td>
-        <td>{{ nagivatorObj.maxTouchPoints }}</td>
+        <td>{{ navigatorObj.maxTouchPoints }}</td>
       </tr>
       <tr>
         <td>可用的逻辑处理器核心数</td>
-        <td>{{ nagivatorObj.hardwareConcurrency }}</td>
+        <td>{{ navigatorObj.hardwareConcurrency }}</td>
       </tr>
       <!-- <tr>
         <td>地理位位置信息</td>
@@ -240,7 +303,7 @@ function showChart(source) {
       </tr> -->
       <tr>
         <td>浏览器插件</td>
-        <td>{{ Array.from(nagivatorObj.plugins).map(item => item.name).join(',') }}</td>
+        <td>{{ Array.from(navigatorObj.plugins).map(item => item.name).join(',') }}</td>
       </tr>
       <tr>
         <td>设备屏幕的宽高与色彩信息</td>
@@ -250,12 +313,28 @@ function showChart(source) {
         <td>格林威治时间和本地时间之间的时差</td>
         <td>{{ timeObj }}</td>
       </tr>
+      <tr>
+        <td>时区所属</td>
+        <td>{{ extraJsonData.geoplugin_timezone }}</td>
+      </tr>
+      <tr>
+        <td>地区</td>
+        <td>{{ extraJsonData.geoplugin_city }}</td>
+      </tr>
+      <tr>
+        <td>IP</td>
+        <td>{{ extraJsonData.geoplugin_request }}</td>
+      </tr>
+      <tr>
+        <td>compositeString</td>
+        <td>{{ compositeString }}</td>
+      </tr>
+      <tr>
+        <td><button @click="getCompositeHash">compositeHash</button></td>
+        <td>{{ compositeHash }}</td>
+      </tr>
     </tbody>
   </table>
-  <!-- <p class="png_data">HASH OF CANVAS FINGERPRINT: {{ pngData }}</p>
-  <p class="png_data">vendor: {{ webglString.vendor }}</p>
-  <p class="png_data">renderer: {{ webglString.renderer }}</p> -->
-  <div id="main" class="audio_chart"></div>
 </template>
 
 <style scoped>
@@ -268,6 +347,16 @@ a {
 .finger_table {
   border: 2px solid #333333;
   border-collapse: collapse;
+  
+}
+.finger_table td,th {
+  padding: 10px;
+}
+tr td:nth-child(1),th:nth-child(1) {
+  text-align: right;
+}
+tr td:nth-child(2),th:nth-child(2) {
+  text-align: left;
 }
 .audio_chart {
   width: 80%;
